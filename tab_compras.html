@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório de Compras</title>
+    <link rel="icon" href="imagens/icon.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .table-header {
+            background-color: #343a40;
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .nav-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        .section-title {
+            border-left: 5px solid #ffc107;
+            padding-left: 10px;
+            margin: 20px 0;
+        }
+        .stats-card {
+            transition: all 0.3s ease;
+        }
+        .stats-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+        .filtro-section {
+            background-color: #e7f3ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Cabeçalho -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
+        <div class="container">
+            <a class="navbar-brand nav-brand" href="#">
+                <i class="fas fa-users-cog me-2"></i>Controle de Estoque
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="contagem.html"><i class="fas fa-clipboard-list me-1"></i>Contagem</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="registros.html"><i class="fas fa-history me-1"></i>Registros</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="adm_est.html"><i class="fas fa-chart-line me-1"></i>Admin Estoque</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="compras.html"><i class="fas fa-cart-plus me-1"></i>Compras</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="tab_compras.html"><i class="fas fa-receipt me-1"></i>Relatório Compras</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="admin.html"><i class="fas fa-users-cog me-1"></i>Admin Usuários</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="fazerLogout()"><i class="fas fa-sign-out-alt me-1"></i>Sair</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h2 class="section-title">Relatório de Compras</h2>
+                
+                <div class="filtro-section">
+                    <h5>Filtro por Período</h5>
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label for="dataInicio" class="form-label">Data Início</label>
+                            <input type="date" class="form-control" id="dataInicio">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="dataFim" class="form-label">Data Fim</label>
+                            <input type="date" class="form-control" id="dataFim">
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-primary" onclick="aplicarFiltro()">
+                                <i class="fas fa-filter me-1"></i>Aplicar Filtro
+                            </button>
+                            <button class="btn btn-outline-secondary ms-2" onclick="limparFiltro()">
+                                <i class="fas fa-times me-1"></i>Limpar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="card-title mb-0" id="tituloRelatorio">Todas as Compras</h5>
+                            <div>
+                                <button class="btn btn-outline-primary" onclick="exportarParaExcel()" id="btnExportar">
+                                    <i class="fas fa-download me-1"></i>Exportar Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-3">
+                                <div class="card bg-light stats-card">
+                                    <div class="card-body text-center">
+                                        <h6>Total de Itens</h6>
+                                        <h3 id="totalItens">0</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-success text-white stats-card">
+                                    <div class="card-body text-center">
+                                        <h6>Valor Total</h6>
+                                        <h4 id="valorTotal">R$ 0,00</h4>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-info text-white stats-card">
+                                    <div class="card-body text-center">
+                                        <h6>Quantidade Total</h6>
+                                        <h3 id="quantidadeTotal">0</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-warning text-white stats-card">
+                                    <div class="card-body text-center">
+                                        <h6>Registros</h6>
+                                        <h3 id="totalRegistros">0</h3>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover table-striped">
+                                <thead class="table-header">
+                                    <tr>
+                                        <th>Data/Hora</th>
+                                        <th>Item</th>
+                                        <th>Valor Unitário</th>
+                                        <th>Quantidade</th>
+                                        <th>Fornecedor</th>
+                                        <th>Valor Total</th>
+                                        <th>Usuário</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabelaRelatorio">
+                                    <!-- Os dados serão preenchidos via JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container para notificações -->
+    <div class="toast-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyALbn7ZCTfC7u2otwO2Z1kqp2jMHYPpDQk",
+            authDomain: "stock-control-a168b.firebaseapp.com",
+            databaseURL: "https://stock-control-a168b-default-rtdb.firebaseio.com",
+            projectId: "stock-control-a168b",
+            storageBucket: "stock-control-a168b.firebasestorage.app",
+            messagingSenderId: "200894157109",
+            appId: "1:200894157109:web:119ad5ee8432fb8a7b3c7c"
+        };
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const auth = firebase.auth();
+
+        let usuarioLogado = null;
+        let todasCompras = [];
+        let comprasFiltradas = [];
+
+        // Função para carregar todas as compras
+        function carregarCompras() {
+            database.ref('compras').orderByChild('timestamp').once('value')
+                .then((snapshot) => {
+                    todasCompras = [];
+                    snapshot.forEach((childSnapshot) => {
+                        const registro = childSnapshot.val();
+                        registro.id = childSnapshot.key;
+                        todasCompras.push(registro);
+                    });
+                    
+                    // Ordenar por timestamp (mais recente primeiro)
+                    todasCompras.sort((a, b) => b.timestamp - a.timestamp);
+                    
+                    comprasFiltradas = [...todasCompras];
+                    exibirCompras();
+                })
+                .catch((error) => {
+                    console.error('Erro ao carregar compras:', error);
+                    mostrarToast('Erro ao carregar compras', 'danger');
+                });
+        }
+
+        // Função para aplicar filtro
+        function aplicarFiltro() {
+            const dataInicio = document.getElementById('dataInicio').value;
+            const dataFim = document.getElementById('dataFim').value;
+            
+            if (!dataInicio || !dataFim) {
+                mostrarToast('Selecione ambas as datas para filtrar', 'warning');
+                return;
+            }
+            
+            const inicio = new Date(dataInicio);
+            const fim = new Date(dataFim);
+            fim.setHours(23, 59, 59, 999); // Fim do dia
+            
+            comprasFiltradas = todasCompras.filter(registro => {
+                const dataRegistro = new Date(registro.timestamp);
+                return dataRegistro >= inicio && dataRegistro <= fim;
+            });
+            
+            document.getElementById('tituloRelatorio').textContent = 
+                `Compras de ${dataInicio} à ${dataFim}`;
+            
+            exibirCompras();
+        }
+
+        // Função para limpar filtro
+        function limparFiltro() {
+            document.getElementById('dataInicio').value = '';
+            document.getElementById('dataFim').value = '';
+            comprasFiltradas = [...todasCompras];
+            document.getElementById('tituloRelatorio').textContent = 'Todas as Compras';
+            exibirCompras();
+        }
+
+        // Função para exibir compras na tabela
+        function exibirCompras() {
+            const tabelaBody = document.getElementById('tabelaRelatorio');
+            tabelaBody.innerHTML = '';
+            
+            let totalItens = 0;
+            let valorTotal = 0;
+            let quantidadeTotal = 0;
+            
+            comprasFiltradas.forEach(registro => {
+                registro.compras.forEach(compra => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${compra.dataHora}</td>
+                        <td>${compra.item}</td>
+                        <td>R$ ${compra.valorUnitario.toFixed(2).replace('.', ',')}</td>
+                        <td>${compra.quantidade}</td>
+                        <td>${compra.fornecedor}</td>
+                        <td>R$ ${compra.valorTotal.toFixed(2).replace('.', ',')}</td>
+                        <td>${compra.usuario}</td>
+                    `;
+                    tabelaBody.appendChild(row);
+                    
+                    totalItens++;
+                    valorTotal += compra.valorTotal;
+                    quantidadeTotal += compra.quantidade;
+                });
+            });
+            
+            // Atualizar estatísticas
+            document.getElementById('totalItens').textContent = totalItens;
+            document.getElementById('valorTotal').textContent = `R$ ${valorTotal.toFixed(2).replace('.', ',')}`;
+            document.getElementById('quantidadeTotal').textContent = quantidadeTotal;
+            document.getElementById('totalRegistros').textContent = comprasFiltradas.length;
+            
+            // Habilitar/desabilitar botão de exportação
+            document.getElementById('btnExportar').disabled = comprasFiltradas.length === 0;
+        }
+
+        // Função para exportar para Excel
+        function exportarParaExcel() {
+            if (comprasFiltradas.length === 0) {
+                mostrarToast('Nenhum dado para exportar', 'warning');
+                return;
+            }
+            
+            const dataInicio = document.getElementById('dataInicio').value;
+            const dataFim = document.getElementById('dataFim').value;
+            
+            let nomeArquivo = 'compras_realizadas';
+            if (dataInicio && dataFim) {
+                nomeArquivo += `_${dataInicio}_a_${dataFim}`;
+            } else {
+                nomeArquivo += '_todas';
+            }
+            
+            let csvContent = "Compras Realizadas";
+            if (dataInicio && dataFim) {
+                csvContent += ` - Período: ${dataInicio} à ${dataFim}\n`;
+            }
+            csvContent += `Data de Exportação: ${new Date().toLocaleDateString('pt-BR')}\n\n`;
+            
+            // Cabeçalho
+            csvContent += "Data/Hora;Item;Valor Unitário;Quantidade;Fornecedor;Valor Total;Usuário\n";
+            
+            // Dados
+            comprasFiltradas.forEach(registro => {
+                registro.compras.forEach(compra => {
+                    csvContent += `"${compra.dataHora}";"${compra.item}";"R$ ${compra.valorUnitario.toFixed(2).replace('.', ',')}";"${compra.quantidade}";"${compra.fornecedor}";"R$ ${compra.valorTotal.toFixed(2).replace('.', ',')}";"${compra.usuario}"\n`;
+                });
+            });
+            
+            // Criar e baixar o arquivo
+            const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute("href", url);
+            link.setAttribute("download", `${nomeArquivo}.csv`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            mostrarToast('Dados exportados com sucesso', 'success');
+        }
+
+        // Função para mostrar notificações toast
+        function mostrarToast(mensagem, tipo = 'info') {
+            const toastContainer = document.querySelector('.toast-container');
+            const toastId = 'toast-' + Date.now();
+            
+            const toastEl = document.createElement('div');
+            toastEl.className = `toast align-items-center text-white bg-${tipo} border-0`;
+            toastEl.setAttribute('role', 'alert');
+            toastEl.setAttribute('aria-live', 'assertive');
+            toastEl.setAttribute('aria-atomic', 'true');
+            toastEl.id = toastId;
+            
+            toastEl.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        ${mensagem}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            `;
+            
+            toastContainer.appendChild(toastEl);
+            
+            const toast = new bootstrap.Toast(toastEl, {
+                autohide: true,
+                delay: 3000
+            });
+            
+            toast.show();
+            
+            // Remover o toast do DOM após ser escondido
+            toastEl.addEventListener('hidden.bs.toast', function() {
+                toastEl.remove();
+            });
+        }
+
+        // Função de logout
+        function fazerLogout() {
+            if (confirm('Deseja realmente sair do sistema?')) {
+                auth.signOut().then(() => {
+                    usuarioLogado = null;
+                    localStorage.removeItem('usuarioLogado');
+                    window.location.href = 'index.html';
+                });
+            }
+        }
+
+        // Inicializar a página
+        document.addEventListener('DOMContentLoaded', function() {
+            // Verificar autenticação
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    usuarioLogado = user;
+                    carregarCompras();
+                } else {
+                    window.location.href = 'index.html';
+                }
+            });
+            
+            // Definir datas padrão (últimos 30 dias)
+            const dataFim = new Date();
+            const dataInicio = new Date();
+            dataInicio.setDate(dataInicio.getDate() - 30);
+            
+            document.getElementById('dataInicio').value = dataInicio.toISOString().split('T')[0];
+            document.getElementById('dataFim').value = dataFim.toISOString().split('T')[0];
+        });
+    </script>
+</body>
+</html>

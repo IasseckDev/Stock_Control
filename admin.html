@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administração de Usuários</title>
+    <link rel="icon" href="imagens/icon.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .table-header {
+            background-color: #343a40;
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .nav-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        .section-title {
+            border-left: 5px solid #ffc107;
+            padding-left: 10px;
+            margin: 20px 0;
+        }
+        .stats-card {
+            transition: all 0.3s ease;
+        }
+        .stats-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+        .tab-content {
+            background: white;
+            padding: 20px;
+            border-radius: 0 0 8px 8px;
+            border: 1px solid #dee2e6;
+            border-top: none;
+        }
+        .admin-badge {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        .user-badge {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        .access-denied {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        .access-denied i {
+            font-size: 4rem;
+            color: #dc3545;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Cabeçalho -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
+        <div class="container">
+            <a class="navbar-brand nav-brand" href="#">
+                <i class="fas fa-users-cog me-2"></i>Controle de Estoque
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="contagem.html"><i class="fas fa-clipboard-list me-1"></i>Contagem</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="registros.html"><i class="fas fa-history me-1"></i>Registros</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="adm_est.html"><i class="fas fa-chart-line me-1"></i>Admin Estoque</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="compras.html"><i class="fas fa-cart-plus me-1"></i>Compras</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="tab_compras.html"><i class="fas fa-receipt me-1"></i>Relatório Compras</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="admin.html"><i class="fas fa-users-cog me-1"></i>Admin Usuários</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="fazerLogout()"><i class="fas fa-sign-out-alt me-1"></i>Sair</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Área de Acesso Negado (inicialmente visível) -->
+        <div id="accessDenied" class="access-denied" style="display: none;">
+            <i class="fas fa-ban"></i>
+            <h2>Acesso Negado</h2>
+            <p class="text-muted">Você não possui permissão para acessar esta área.</p>
+            <p>Somente usuários com perfil de administrador podem acessar esta página.</p>
+            <a href="contagem.html" class="btn btn-primary mt-3">
+                <i class="fas fa-arrow-left me-2"></i>Voltar para Contagem
+            </a>
+        </div>
+
+        <!-- Área de Administração (inicialmente oculta) -->
+        <div id="adminArea" style="display: none;">
+            <div class="row">
+                <div class="col-12">
+                    <h2 class="section-title">Administração de Usuários</h2>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Gerencie os usuários do sistema e solicitações de cadastro.
+                        <span class="admin-badge ms-2">ADMIN</span>
+                    </div>
+
+                    <!-- Abas -->
+                    <ul class="nav nav-tabs" id="adminTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="cadastro-tab" data-bs-toggle="tab" data-bs-target="#cadastro" type="button" role="tab">
+                                <i class="fas fa-user-plus me-1"></i>Cadastrar Usuário
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="usuarios-tab" data-bs-toggle="tab" data-bs-target="#usuarios" type="button" role="tab">
+                                <i class="fas fa-users me-1"></i>Usuários Cadastrados
+                            </button>
+                        </li>
+                    </ul>
+
+                    <!-- Conteúdo das Abas -->
+                    <div class="tab-content" id="adminTabsContent">
+                        
+                        <!-- Aba de Cadastro -->
+                        <div class="tab-pane fade show active" id="cadastro" role="tabpanel">
+                            <div class="row justify-content-center">
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">Cadastrar Novo Usuário</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <form id="formCadastro">
+                                                <div class="mb-3">
+                                                    <label for="email" class="form-label">Email</label>
+                                                    <input type="email" class="form-control" id="email" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label for="senha" class="form-label">Senha</label>
+                                                    <input type="password" class="form-control" id="senha" required minlength="6">
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label for="confirmarSenha" class="form-label">Confirmar Senha</label>
+                                                    <input type="password" class="form-control" id="confirmarSenha" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label for="tipoUsuario" class="form-label">Tipo de Usuário</label>
+                                                    <select class="form-select" id="tipoUsuario" required>
+                                                        <option value="user">Usuário Comum</option>
+                                                        <option value="admin">Administrador</option>
+                                                    </select>
+                                                    <div class="form-text">
+                                                        <span class="user-badge">Usuário Comum</span> - Acesso às funcionalidades básicas<br>
+                                                        <span class="admin-badge">Administrador</span> - Acesso total ao sistema
+                                                    </div>
+                                                </div>
+                                                <button type="submit" class="btn btn-primary w-100">
+                                                    <i class="fas fa-user-plus me-1"></i>Cadastrar Usuário
+                                                </button>
+                                            </form>
+                                            <div id="mensagemCadastro" class="mt-3"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Aba de Usuários Cadastrados -->
+                        <div class="tab-pane fade" id="usuarios" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5>Usuários do Sistema</h5>
+                                <button class="btn btn-outline-primary btn-sm" onclick="carregarUsuarios()">
+                                    <i class="fas fa-sync-alt me-1"></i>Atualizar
+                                </button>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover table-striped">
+                                    <thead class="table-header">
+                                        <tr>
+                                            <th>Email</th>
+                                            <th>Tipo</th>
+                                            <th>Data de Criação</th>
+                                            <th>Último Login</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tabelaUsuarios">
+                                        <tr>
+                                            <td colspan="5" class="text-center">Carregando usuários...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container para notificações -->
+    <div class="toast-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyALbn7ZCTfC7u2otwO2Z1kqp2jMHYPpDQk",
+            authDomain: "stock-control-a168b.firebaseapp.com",
+            databaseURL: "https://stock-control-a168b-default-rtdb.firebaseio.com",
+            projectId: "stock-control-a168b",
+            storageBucket: "stock-control-a168b.firebasestorage.app",
+            messagingSenderId: "200894157109",
+            appId: "1:200894157109:web:119ad5ee8432fb8a7b3c7c"
+        };
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const auth = firebase.auth();
+
+        let usuarioLogado = null;
+        let isAdmin = false;
+
+        // Função para verificar se o usuário é admin
+        async function verificarSeEhAdmin(uid) {
+            try {
+                const snapshot = await database.ref('usuarios_roles/' + uid).once('value');
+                const userRole = snapshot.val();
+                return userRole && userRole.role === 'admin';
+            } catch (error) {
+                console.error('Erro ao verificar permissões:', error);
+                return false;
+            }
+        }
+
+        // Função para cadastrar usuário
+        async function cadastrarUsuario(email, senha, tipoUsuario) {
+            try {
+                // Criar usuário no Authentication
+                const userCredential = await auth.createUserWithEmailAndPassword(email, senha);
+                const user = userCredential.user;
+                
+                // Salvar informações adicionais no Realtime Database
+                await database.ref('usuarios/' + user.uid).set({
+                    email: user.email,
+                    dataCriacao: new Date().toISOString(),
+                    criadoPor: usuarioLogado.email,
+                    tipo: tipoUsuario
+                });
+
+                // Salvar role do usuário
+                await database.ref('usuarios_roles/' + user.uid).set({
+                    role: tipoUsuario,
+                    email: user.email,
+                    dataAtribuicao: new Date().toISOString()
+                });
+
+                return { success: true, user: user };
+            } catch (error) {
+                return { success: false, error: error };
+            }
+        }
+
+        // Função para carregar usuários
+        async function carregarUsuarios() {
+            const tabelaUsuarios = document.getElementById('tabelaUsuarios');
+            tabelaUsuarios.innerHTML = '<tr><td colspan="5" class="text-center">Carregando usuários...</td></tr>';
+
+            try {
+                // Carregar usuários do Authentication (via Database)
+                const usuariosSnapshot = await database.ref('usuarios').once('value');
+                const usuarios = usuariosSnapshot.val();
+
+                if (!usuarios) {
+                    tabelaUsuarios.innerHTML = '<tr><td colspan="5" class="text-center">Nenhum usuário cadastrado</td></tr>';
+                    return;
+                }
+
+                let html = '';
+                for (const [uid, userData] of Object.entries(usuarios)) {
+                    const roleSnapshot = await database.ref('usuarios_roles/' + uid).once('value');
+                    const roleData = roleSnapshot.val();
+                    const role = roleData ? roleData.role : 'user';
+
+                    html += `
+                        <tr>
+                            <td>${userData.email}</td>
+                            <td>
+                                ${role === 'admin' ? 
+                                    '<span class="admin-badge">Administrador</span>' : 
+                                    '<span class="user-badge">Usuário Comum</span>'
+                                }
+                            </td>
+                            <td>${userData.dataCriacao ? new Date(userData.dataCriacao).toLocaleString('pt-BR') : 'N/A'}</td>
+                            <td>${userData.ultimoLogin ? new Date(userData.ultimoLogin).toLocaleString('pt-BR') : 'Nunca'}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-warning me-1" onclick="alterarTipoUsuario('${uid}', '${role}')" ${uid === usuarioLogado.uid ? 'disabled' : ''}>
+                                    <i class="fas fa-exchange-alt"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="excluirUsuario('${uid}')" ${uid === usuarioLogado.uid ? 'disabled' : ''}>
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                tabelaUsuarios.innerHTML = html;
+            } catch (error) {
+                console.error('Erro ao carregar usuários:', error);
+                tabelaUsuarios.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Erro ao carregar usuários</td></tr>';
+            }
+        }
+
+        // Função para alterar tipo de usuário
+        async function alterarTipoUsuario(uid, currentRole) {
+            const novoRole = currentRole === 'admin' ? 'user' : 'admin';
+            const confirmacao = confirm(`Deseja alterar este usuário para ${novoRole === 'admin' ? 'Administrador' : 'Usuário Comum'}?`);
+            
+            if (confirmacao) {
+                try {
+                    await database.ref('usuarios_roles/' + uid).update({
+                        role: novoRole
+                    });
+                    
+                    await database.ref('usuarios/' + uid).update({
+                        tipo: novoRole
+                    });
+
+                    mostrarToast(`Tipo de usuário alterado para ${novoRole === 'admin' ? 'Administrador' : 'Usuário Comum'}`, 'success');
+                    carregarUsuarios();
+                } catch (error) {
+                    console.error('Erro ao alterar tipo de usuário:', error);
+                    mostrarToast('Erro ao alterar tipo de usuário', 'danger');
+                }
+            }
+        }
+
+        // Função para excluir usuário
+        async function excluirUsuario(uid) {
+            const confirmacao = confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.');
+            
+            if (confirmacao) {
+                try {
+                    // Excluir do Authentication (requer backend)
+                    mostrarToast('Para excluir usuários do Authentication, é necessário implementar um backend com Firebase Admin SDK.', 'warning');
+                    
+                    // Excluir dados do Database
+                    await database.ref('usuarios/' + uid).remove();
+                    await database.ref('usuarios_roles/' + uid).remove();
+                    
+                    mostrarToast('Dados do usuário removidos do sistema', 'success');
+                    carregarUsuarios();
+                } catch (error) {
+                    console.error('Erro ao excluir usuário:', error);
+                    mostrarToast('Erro ao excluir usuário', 'danger');
+                }
+            }
+        }
+
+        // Função para mostrar notificações toast
+        function mostrarToast(mensagem, tipo = 'info') {
+            const toastContainer = document.querySelector('.toast-container');
+            const toastId = 'toast-' + Date.now();
+            
+            const toastEl = document.createElement('div');
+            toastEl.className = `toast align-items-center text-white bg-${tipo} border-0`;
+            toastEl.setAttribute('role', 'alert');
+            toastEl.setAttribute('aria-live', 'assertive');
+            toastEl.setAttribute('aria-atomic', 'true');
+            toastEl.id = toastId;
+            
+            toastEl.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        ${mensagem}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            `;
+            
+            toastContainer.appendChild(toastEl);
+            
+            const toast = new bootstrap.Toast(toastEl, {
+                autohide: true,
+                delay: 3000
+            });
+            
+            toast.show();
+            
+            // Remover o toast do DOM após ser escondido
+            toastEl.addEventListener('hidden.bs.toast', function() {
+                toastEl.remove();
+            });
+        }
+
+        // Função de logout
+        function fazerLogout() {
+            if (confirm('Deseja realmente sair do sistema?')) {
+                auth.signOut().then(() => {
+                    usuarioLogado = null;
+                    localStorage.removeItem('usuarioLogado');
+                    window.location.href = 'index.html';
+                });
+            }
+        }
+
+        // Inicializar a página
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Verificar autenticação
+            auth.onAuthStateChanged(async (user) => {
+                if (user) {
+                    usuarioLogado = user;
+                    console.log('Usuário logado:', user.email);
+                    
+                    // Verificar se é admin
+                    isAdmin = await verificarSeEhAdmin(user.uid);
+                    console.log('É admin?', isAdmin);
+                    
+                    if (isAdmin) {
+                        // Mostrar área de administração
+                        document.getElementById('adminArea').style.display = 'block';
+                        document.getElementById('accessDenied').style.display = 'none';
+                        
+                        // Carregar usuários
+                        carregarUsuarios();
+                    } else {
+                        // Mostrar acesso negado
+                        document.getElementById('adminArea').style.display = 'none';
+                        document.getElementById('accessDenied').style.display = 'block';
+                    }
+                } else {
+                    console.log('Usuário não autenticado, redirecionando...');
+                    window.location.href = 'index.html';
+                }
+            });
+
+            // Event listener para o formulário de cadastro
+            document.getElementById('formCadastro').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const email = document.getElementById('email').value;
+                const senha = document.getElementById('senha').value;
+                const confirmarSenha = document.getElementById('confirmarSenha').value;
+                const tipoUsuario = document.getElementById('tipoUsuario').value;
+                const mensagemDiv = document.getElementById('mensagemCadastro');
+                
+                // Limpar mensagens anteriores
+                mensagemDiv.innerHTML = '';
+                
+                // Validações
+                if (senha !== confirmarSenha) {
+                    mensagemDiv.innerHTML = '<div class="alert alert-danger">As senhas não coincidem.</div>';
+                    return;
+                }
+                
+                if (senha.length < 6) {
+                    mensagemDiv.innerHTML = '<div class="alert alert-danger">A senha deve ter pelo menos 6 caracteres.</div>';
+                    return;
+                }
+                
+                // Desabilitar formulário
+                const submitBtn = this.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Cadastrando...';
+                
+                // Cadastrar usuário
+                const resultado = await cadastrarUsuario(email, senha, tipoUsuario);
+                
+                if (resultado.success) {
+                    mensagemDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            Usuário cadastrado com sucesso! 
+                            ${tipoUsuario === 'admin' ? 
+                                '<span class="admin-badge">Administrador</span>' : 
+                                '<span class="user-badge">Usuário Comum</span>'
+                            }
+                        </div>
+                    `;
+                    document.getElementById('formCadastro').reset();
+                    carregarUsuarios();
+                } else {
+                    let mensagemErro = 'Erro ao cadastrar usuário: ';
+                    switch(resultado.error.code) {
+                        case 'auth/email-already-in-use':
+                            mensagemErro += 'Este email já está em uso.';
+                            break;
+                        case 'auth/invalid-email':
+                            mensagemErro += 'Email inválido.';
+                            break;
+                        case 'auth/weak-password':
+                            mensagemErro += 'Senha muito fraca. Use pelo menos 6 caracteres.';
+                            break;
+                        case 'auth/operation-not-allowed':
+                            mensagemErro += 'Operação não permitida. Verifique as configurações do Firebase.';
+                            break;
+                        default:
+                            mensagemErro += resultado.error.message;
+                    }
+                    mensagemDiv.innerHTML = `<div class="alert alert-danger">${mensagemErro}</div>`;
+                }
+                
+                // Reabilitar formulário
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-user-plus me-1"></i>Cadastrar Usuário';
+            });
+        });
+    </script>
+</body>
+</html>

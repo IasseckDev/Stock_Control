@@ -1,0 +1,50 @@
+
+a {
+    text-decoration: none;
+
+}
+
+.square-input {
+    width: 53px;
+    height: 35px;
+    text-size-adjust: 0.75em;
+}
+
+.item-contagem {
+    background-color:white;
+    border-color: black;
+}
+
+
+.grad-amar {
+
+   background: linear-gradient(90deg, #132c52, #d64953, #f9f0e6);
+}
+
+.grad-pret{
+    background: linear-gradient(90deg, #000000, #262626, #474747);
+}
+
+
+
+/* Small devices (landscape phones, 576px and up) */
+@media (min-width: 576px) and (max-width: 767.98px) {
+	
+}
+
+/* Small devices (landscape phones, 576px and up) */
+@media (max-width: 576px) and (min-width: 100px) {
+	
+}
+
+@media (min-width: 100px) and (max-width: 450px) {
+	
+	
+
+}
+
+@media (min-width: 450px) and (max-width: 100px) {
+	
+    
+	
+}

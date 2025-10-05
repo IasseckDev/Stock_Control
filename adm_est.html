@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administração de Estoque</title>
+    <link rel="icon" href="imagens/icon.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .header {
+            background-color: #ffc107;
+            color: #343a40;
+        }
+        .table-header {
+            background-color: #343a40;
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .category-header {
+            background-color: #e9ecef;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        .table-responsive {
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        input[type="number"] {
+            width: 100%;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            padding: 5px;
+            text-align: center;
+        }
+        .positive-diff {
+            background-color: #d4edda;
+        }
+        .negative-diff {
+            background-color: #f8d7da;
+        }
+        .nav-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        .section-title {
+            border-left: 5px solid #ffc107;
+            padding-left: 10px;
+            margin: 20px 0;
+        }
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+        .stats-card {
+            transition: all 0.3s ease;
+        }
+        .stats-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+        .export-modal .modal-body {
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        .autosave-indicator {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-left: 10px;
+        }
+        .btn-save {
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-save .spinner-border {
+            width: 1rem;
+            height: 1rem;
+            display: none;
+        }
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        .login-form {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 400px;
+        }
+        .data-info {
+            background-color: #e7f3ff;
+            border-left: 4px solid #0d6efd;
+            padding: 10px 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+     <!-- Cabeçalho -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
+        <div class="container">
+            <a class="navbar-brand nav-brand" href="#">
+                <i class="fas fa-users-cog me-2"></i>Controle de Estoque
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="contagem.html"><i class="fas fa-clipboard-list me-1"></i>Contagem</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="registros.html"><i class="fas fa-history me-1"></i>Registros</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="adm_est.html"><i class="fas fa-chart-line me-1"></i>Admin Estoque</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="compras.html"><i class="fas fa-cart-plus me-1"></i>Compras</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="tab_compras.html"><i class="fas fa-receipt me-1"></i>Relatório Compras</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="admin.html"><i class="fas fa-users-cog me-1"></i>Admin Usuários</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="fazerLogout()"><i class="fas fa-sign-out-alt me-1"></i>Sair</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h2 class="section-title">Administração de Estoque</h2>
+                
+                <!-- Informações sobre a data da contagem -->
+                <div class="data-info">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong><i class="fas fa-calendar me-2"></i>Data da Última Contagem:</strong>
+                            <span id="dataUltimaContagem">Carregando...</span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong><i class="fas fa-calendar me-2"></i>Data da Penúltima Contagem:</strong>
+                            <span id="dataPenultimaContagem">Carregando...</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span id="infoText">Carregando dados do estoque...</span>
+                </div>
+                
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="card-title mb-0">Análise de Consumo e Estoque</h5>
+                            <div>
+                                <button class="btn btn-outline-primary btn-sm me-2" onclick="abrirModalExportacao()">
+                                    <i class="fas fa-download me-1"></i>Exportar
+                                </button>
+                                <button class="btn btn-success btn-sm btn-save" onclick="salvarDados()" id="btnSalvar">
+                                    <i class="fas fa-save me-1"></i>Salvar Alterações
+                                    <span class="spinner-border spinner-border-sm"></span>
+                                </button>
+                                <span class="autosave-indicator" id="autosaveIndicator"></span>
+                            </div>
+                        </div>
+                        
+                        <div id="loading" class="loading">
+                            <div class="text-center">
+                                <div class="spinner-border text-warning" role="status">
+                                    <span class="visually-hidden">Carregando...</span>
+                                </div>
+                                <p class="mt-2">Carregando dados do estoque...</p>
+                            </div>
+                        </div>
+                        
+                        <div id="tabelaEstoque" style="display: none;">
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover table-striped">
+                                    <thead class="table-header">
+                                        <tr>
+                                            <th width="25%">Item</th>
+                                            <th width="15%">Contagem</th>
+                                            <th width="15%">Consumo Semanal</th>
+                                            <th width="15%">Consumo no Sistema</th>
+                                            <th width="15%">Diferença</th>
+                                            <th width="15%">Estoque Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tabelaBody">
+                                        <!-- Os dados serão preenchidos via JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="mt-3 d-flex justify-content-between">
+                                <div>
+                                    <span class="badge bg-success me-2">Diferença Positiva</span>
+                                    <span class="badge bg-danger">Diferença Negativa</span>
+                                </div>
+                                <div>
+                                    <button class="btn btn-primary" onclick="calcularTudo()">
+                                        <i class="fas fa-calculator me-1"></i>Calcular Tudo
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mt-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Resumo</h5>
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-light stats-card">
+                                    <div class="card-body text-center">
+                                        <h6>Total de Itens</h6>
+                                        <h3 id="totalItens">0</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-success text-white stats-card">
+                                    <div class="card-body text-center">
+                                        <h6>Diferenças Positivas</h6>
+                                        <h3 id="diffPositivas">0</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-danger text-white stats-card">
+                                    <div class="card-body text-center">
+                                        <h6>Diferenças Negativas</h6>
+                                        <h3 id="diffNegativas">0</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-info text-white stats-card">
+                                    <div class="card-body text-center">
+                                        <h6>Itens com Maior Consumo</h6>
+                                        <h5 id="maiorConsumo">-</h5>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Exportação -->
+    <div class="modal fade export-modal" id="modalExportacao" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Exportar Dados</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nome do arquivo:</label>
+                        <input type="text" class="form-control" id="nomeArquivo" value="contagem_de_estoque">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Selecione as colunas para exportar:</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="checkItem" checked>
+                            <label class="form-check-label" for="checkItem">Item</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="checkContagem" checked>
+                            <label class="form-check-label" for="checkContagem">Contagem</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="checkConsumoSemanal" checked>
+                            <label class="form-check-label" for="checkConsumoSemanal">Consumo Semanal</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="checkConsumoSistema" checked>
+                            <label class="form-check-label" for="checkConsumoSistema">Consumo no Sistema</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="checkDiferenca" checked>
+                            <label class="form-check-label" for="checkDiferenca">Diferença</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="checkEstoqueTotal" checked>
+                            <label class="form-check-label" for="checkEstoqueTotal">Estoque Total</label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Formato de exportação:</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="exportFormat" id="formatCSV" value="csv" checked>
+                            <label class="form-check-label" for="formatCSV">CSV (Excel)</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="exportFormat" id="formatJSON" value="json">
+                            <label class="form-check-label" for="formatJSON">JSON</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="exportarDados()">Exportar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container para notificações -->
+    <div class="toast-container"></div>
+
+    <!-- Overlay de Login -->
+    <div class="login-overlay" id="loginOverlay" style="display: none;">
+        <div class="login-form">
+            <h3 class="text-center mb-4">Autenticação Requerida</h3>
+            <div class="mb-3">
+                <label for="loginEmail" class="form-label">Email</label>
+                <input type="email" class="form-control" id="loginEmail" placeholder="seu@email.com">
+            </div>
+            <div class="mb-3">
+                <label for="loginPassword" class="form-label">Senha</label>
+                <input type="password" class="form-control" id="loginPassword" placeholder="Sua senha">
+            </div>
+            <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="rememberLogin">
+                <label class="form-check-label" for="rememberLogin">Lembrar-me</label>
+            </div>
+            <button type="button" class="btn btn-primary w-100" onclick="fazerLogin()">Entrar</button>
+            <div class="alert alert-danger mt-3" id="loginError" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyALbn7ZCTfC7u2otwO2Z1kqp2jMHYPpDQk",
+            authDomain: "stock-control-a168b.firebaseapp.com",
+            databaseURL: "https://stock-control-a168b-default-rtdb.firebaseio.com",
+            projectId: "stock-control-a168b",
+            storageBucket: "stock-control-a168b.firebasestorage.app",
+            messagingSenderId: "200894157109",
+            appId: "1:200894157109:web:119ad5ee8432fb8a7b3c7c"
+        };
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const auth = firebase.auth();
+
+        // Estrutura completa de itens (igual à contagem.html)
+        const categoriasItens = {
+            "Chopp": [
+                "Heiniken", "Amstel", "Baden IPA", "Vinho Tinto", "Vinho Rose", 
+                "Brahma", "Tiger"
+            ],
+            "Longneck": [
+                "Heiniken Longneck", "Heiniken Zero", "Eisenbahn", "Patagônia", 
+                "Skol Beats", "Smirnoff Ice", "Lagunitas", "Becks", "Corona", 
+                "Stella", "Stella Gold", "Sol", "Sol Zero", "Budweiser", 
+                "Budweiser Zero", "Spaten"
+            ],
+            "Soft Drinks": [
+                "Coca Cola", "Coca Zero", "Fanta Laranja", "Fanta Uva", 
+                "Fanta Guaraná", "Schweppes Citrus", "Schweppes Citrus Zero", 
+                "Schweppes Tônica", "Schweppes Tônica Zero", "Água", 
+                "Água com Gás", "Tonica 1,5L", "Citrus 1,5L"
+            ],
+            "Energéticos": [
+                "Red Bull", "Red Bull Sugar Free", "Red Bull Tropical", 
+                "Red Bull Melão", "Red Bull Pomelo", "Red Bull Pessêgo", 
+                "Red Bull Melancia", "Monster", "Monster Mango Loco"
+            ],
+            "Bases Alcoolicas": [
+                "Bacardi Ouro", "Bacardi Prata", "Smirnoff", "Jack Daniels", 
+                "Campari", "Aperol", "Vermouth Rosso", "Absolut", "Tequila Ouro", 
+                "Tequila Prata", "Jim Beam", "Licor Fino", "Steinhager", 
+                "Chivas 12", "Chivas 15", "Velho Barrero", "Sake", "Vinho", 
+                "Malibu", "Martine Dry", "Cachaça Artesanal", "Licor de Menta", 
+                "Gordons", "Gordons Rose", "Espumante", "Jagermeister", "Licor 43"
+            ],
+            "Monin": [
+                "Monin Blue Barry", "Monin Morango", "Monin Toranja", 
+                "Monin Crawnberry", "Monin Maçâ Verde"
+            ],
+            "Gelo": [
+                "Gelo 3Kg", "Gelo Cubo"
+            ]
+        };
+
+        // Variáveis globais
+        let ultimaContagem = {};
+        let penultimaContagem = {};
+        let dadosCarregados = false;
+        let dadosConsumo = {};
+        let modalExportacao;
+        let alteracoesPendentes = false;
+        let tempoAutosave;
+        let usuarioLogado = null;
+        let dataUltimaContagem = null;
+        let dataPenultimaContagem = null;
+
+        // Função para fazer login
+        function fazerLogin() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const remember = document.getElementById('rememberLogin').checked;
+            
+            document.getElementById('loginError').style.display = 'none';
+            
+            auth.signInWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    // Login bem-sucedido
+                    usuarioLogado = userCredential.user;
+                    document.getElementById('loginOverlay').style.display = 'none';
+                    
+                    if (remember) {
+                        localStorage.setItem('usuarioLogado', JSON.stringify({
+                            email: email,
+                            uid: usuarioLogado.uid
+                        }));
+                    }
+                    
+                    // Carregar dados após login
+                    carregarDados();
+                })
+                .catch((error) => {
+                    // Tratar erros de login
+                    document.getElementById('loginError').textContent = error.message;
+                    document.getElementById('loginError').style.display = 'block';
+                });
+        }
+
+        // Função para carregar os dados do Firebase
+        function carregarDados() {
+            document.getElementById('loading').style.display = 'flex';
+            document.getElementById('tabelaEstoque').style.display = 'none';
+            document.getElementById('infoText').textContent = 'Carregando dados do estoque...';
+
+            // Buscar as contagens no Firebase
+            database.ref('contagens').orderByChild('timestamp').limitToLast(2).once('value')
+                .then((snapshot) => {
+                    const contagens = snapshot.val();
+                    
+                    if (!contagens) {
+                        document.getElementById('infoText').textContent = 'Nenhuma contagem encontrada.';
+                        document.getElementById('loading').style.display = 'none';
+                        return;
+                    }
+                    
+                    // Converter para array e ordenar por timestamp
+                    const contagensArray = Object.entries(contagens).map(([key, value]) => {
+                        return { id: key, ...value };
+                    }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                    
+                    // Separar a última e a penúltima contagem
+                    if (contagensArray.length > 0) {
+                        ultimaContagem = contagensArray[0].itens || {};
+                        dataUltimaContagem = contagensArray[0].data || new Date(contagensArray[0].timestamp).toLocaleDateString('pt-BR');
+                        
+                        if (contagensArray.length > 1) {
+                            penultimaContagem = contagensArray[1].itens || {};
+                            dataPenultimaContagem = contagensArray[1].data || new Date(contagensArray[1].timestamp).toLocaleDateString('pt-BR');
+                        }
+                        
+                        // Atualizar as datas na interface
+                        document.getElementById('dataUltimaContagem').textContent = dataUltimaContagem;
+                        document.getElementById('dataPenultimaContagem').textContent = dataPenultimaContagem || 'N/A';
+                        
+                        // Atualizar nome do arquivo de exportação
+                        atualizarNomeArquivoExportacao();
+                        
+                        // Carregar dados de consumo salvos
+                        carregarDadosConsumo();
+                    } else {
+                        document.getElementById('infoText').textContent = 'Nenhuma contagem válida encontrada.';
+                        document.getElementById('loading').style.display = 'none';
+                    }
+                })
+                .catch((error) => {
+                    console.error('Erro ao carregar dados:', error);
+                    document.getElementById('infoText').textContent = 'Erro ao carregar dados.';
+                    document.getElementById('loading').style.display = 'none';
+                    mostrarToast('Erro ao carregar dados do Firebase', 'danger');
+                });
+        }
+
+        // Função para atualizar o nome do arquivo de exportação
+        function atualizarNomeArquivoExportacao() {
+            if (dataUltimaContagem) {
+                const dataFormatada = dataUltimaContagem.replace(/\//g, '-');
+                document.getElementById('nomeArquivo').value = `contagem_de_estoque_${dataFormatada}`;
+            }
+        }
+
+        // Função para carregar dados de consumo salvos
+        function carregarDadosConsumo() {
+            database.ref('consumo_sistema').once('value')
+                .then((snapshot) => {
+                    dadosConsumo = snapshot.val() || {};
+                    dadosCarregados = true;
+                    preencherTabela();
+                    
+                    if (Object.keys(ultimaContagem).length > 0) {
+                        document.getElementById('infoText').textContent = 
+                            `Dados carregados: ${dataUltimaContagem}`;
+                    }
+                    
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('tabelaEstoque').style.display = 'block';
+                    
+                    // Verificar se há alterações pendentes
+                    verificarAlteracoesPendentes();
+                })
+                .catch((error) => {
+                    console.error('Erro ao carregar dados de consumo:', error);
+                    dadosConsumo = {};
+                    dadosCarregados = true;
+                    preencherTabela();
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('tabelaEstoque').style.display = 'block';
+                });
+        }
+
+        // Função para preencher a tabela com os dados
+        function preencherTabela() {
+            const tabelaBody = document.getElementById('tabelaBody');
+            tabelaBody.innerHTML = '';
+            
+            let totalItens = 0;
+            let maiorConsumoItem = '';
+            let maiorConsumoValor = 0;
+            
+            // Percorrer todas as categorias e itens
+            for (const [categoria, itens] of Object.entries(categoriasItens)) {
+                // Adicionar cabeçalho da categoria
+                const categoriaRow = document.createElement('tr');
+                categoriaRow.className = 'category-header';
+                categoriaRow.innerHTML = `<td colspan="6">${categoria}</td>`;
+                tabelaBody.appendChild(categoriaRow);
+                
+                // Adicionar itens da categoria
+                for (const item of itens) {
+                    const contagemAtual = ultimaContagem[item] || 0;
+                    const contagemAnterior = penultimaContagem[item] || 0;
+                    const consumoSemanal = Math.max(0, contagemAnterior - contagemAtual);
+                    const consumoSistema = dadosConsumo[item] || 0;
+                    const diferenca = consumoSemanal - consumoSistema;
+                    
+                    // Encontrar o item com maior consumo
+                    if (consumoSemanal > maiorConsumoValor) {
+                        maiorConsumoValor = consumoSemanal;
+                        maiorConsumoItem = item;
+                    }
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${item}</td>
+                        <td>${contagemAtual}</td>
+                        <td>${consumoSemanal}</td>
+                        <td>
+                            <input type="number" value="${consumoSistema}" class="consumo-sistema" data-item="${item}" 
+                                oninput="calcularDiferenca.call(this); marcarComoAlterado('${item}', this.value)">
+                        </td>
+                        <td><input type="number" value="${diferenca}" class="diferenca" data-item="${item}" readonly></td>
+                        <td>${contagemAtual}</td>
+                    `;
+                    
+                    // Aplicar formatação baseada no valor da diferença
+                    const diferencaInput = row.querySelector('.diferenca');
+                    if (diferenca > 0) {
+                        diferencaInput.classList.add('positive-diff');
+                    } else if (diferenca < 0) {
+                        diferencaInput.classList.add('negative-diff');
+                    }
+                    
+                    tabelaBody.appendChild(row);
+                    totalItens++;
+                }
+            }
+            
+            // Atualizar estatísticas
+            document.getElementById('totalItens').textContent = totalItens;
+            document.getElementById('maiorConsumo').textContent = 
+                maiorConsumoItem ? `${maiorConsumoItem} (${maiorConsumoValor})` : '-';
+            
+            // Adicionar event listeners aos inputs
+            document.querySelectorAll('.consumo-sistema').forEach(input => {
+                input.addEventListener('input', calcularDiferenca);
+                input.addEventListener('input', function() {
+                    marcarComoAlterado(this.getAttribute('data-item'), this.value);
+                });
+            });
+            
+            // Calcular estatísticas iniciais
+            atualizarEstatisticas();
+        }
+
+        // Função para marcar item como alterado
+        function marcarComoAlterado(item, valor) {
+            clearTimeout(tempoAutosave);
+            
+            if (dadosConsumo[item] !== parseInt(valor)) {
+                alteracoesPendentes = true;
+                document.getElementById('autosaveIndicator').textContent = 'Alterações não salvas';
+                document.getElementById('autosaveIndicator').style.color = '#dc3545';
+                
+                // Configurar autosave após 5 segundos de inatividade
+                tempoAutosave = setTimeout(() => {
+                    salvarDados();
+                }, 5000);
+            }
+        }
+
+        // Função para verificar se há alterações pendentes
+        function verificarAlteracoesPendentes() {
+            let hasChanges = false;
+            document.querySelectorAll('.consumo-sistema').forEach(input => {
+                const item = input.getAttribute('data-item');
+                const valorAtual = parseInt(input.value) || 0;
+                
+                if (dadosConsumo[item] !== valorAtual) {
+                    hasChanges = true;
+                }
+            });
+            
+            alteracoesPendentes = hasChanges;
+            if (hasChanges) {
+                document.getElementById('autosaveIndicator').textContent = 'Alterações não salvas';
+                document.getElementById('autosaveIndicator').style.color = '#dc3545';
+            } else {
+                document.getElementById('autosaveIndicator').textContent = 'Todas as alterações salvas';
+                document.getElementById('autosaveIndicator').style.color = '#198754';
+            }
+        }
+
+        // Função para calcular a diferença automaticamente
+        function calcularDiferenca() {
+            const item = this.getAttribute('data-item');
+            const consumoSistema = parseInt(this.value) || 0;
+            
+            // Encontrar a linha correspondente
+            const row = this.closest('tr');
+            const consumoSemanalCell = row.cells[2];
+            const diferencaInput = row.querySelector('.diferenca');
+            
+            const consumoSemanal = parseInt(consumoSemanalCell.textContent) || 0;
+            const diferenca = consumoSemanal - consumoSistema;
+            
+            diferencaInput.value = diferenca;
+            
+            // Aplicar formatação baseada no valor
+            diferencaInput.classList.remove('positive-diff', 'negative-diff');
+            if (diferenca > 0) {
+                diferencaInput.classList.add('positive-diff');
+            } else if (diferenca < 0) {
+                diferencaInput.classList.add('negative-diff');
+            }
+            
+            // Atualizar estatísticas
+            atualizarEstatisticas();
+        }
+        
+        // Função para calcular todas as diferenças
+        function calcularTudo() {
+            document.querySelectorAll('.consumo-sistema').forEach(input => {
+                const event = new Event('input');
+                input.dispatchEvent(event);
+            });
+            mostrarToast('Todas as diferenças calculadas', 'success');
+        }
+        
+        // Função para atualizar estatísticas
+        function atualizarEstatisticas() {
+            let diffPositivas = 0;
+            let diffNegativas = 0;
+            
+            document.querySelectorAll('.diferenca').forEach(input => {
+                const valor = parseInt(input.value) || 0;
+                if (valor > 0) diffPositivas++;
+                if (valor < 0) diffNegativas++;
+            });
+            
+            document.getElementById('diffPositivas').textContent = diffPositivas;
+            document.getElementById('diffNegativas').textContent = diffNegativas;
+        }
+        
+        // Função para abrir o modal de exportação
+        function abrirModalExportacao() {
+            if (!modalExportacao) {
+                modalExportacao = new bootstrap.Modal(document.getElementById('modalExportacao'));
+            }
+            
+            // Atualizar nome do arquivo antes de abrir o modal
+            atualizarNomeArquivoExportacao();
+            modalExportacao.show();
+        }
+        
+        // Função para exportar dados
+        function exportarDados() {
+            const formato = document.querySelector('input[name="exportFormat"]:checked').value;
+            const nomeArquivo = document.getElementById('nomeArquivo').value || 'contagem_de_estoque';
+            
+            // Obter colunas selecionadas
+            const colunas = {
+                item: document.getElementById('checkItem').checked,
+                contagem: document.getElementById('checkContagem').checked,
+                consumoSemanal: document.getElementById('checkConsumoSemanal').checked,
+                consumoSistema: document.getElementById('checkConsumoSistema').checked,
+                diferenca: document.getElementById('checkDiferenca').checked,
+                estoqueTotal: document.getElementById('checkEstoqueTotal').checked
+            };
+            
+            if (formato === 'csv') {
+                exportarParaCSV(colunas, nomeArquivo);
+            } else {
+                exportarParaJSON(colunas, nomeArquivo);
+            }
+            
+            // Fechar o modal
+            modalExportacao.hide();
+        }
+        
+        // Função para exportar para CSV
+        function exportarParaCSV(colunas, nomeArquivo) {
+            let csvContent = "";
+            
+            // Adicionar informações da data da contagem
+            csvContent += `Contagem de Estoque - Data da Última Contagem: ${dataUltimaContagem}\n`;
+            if (dataPenultimaContagem) {
+                csvContent += `Data da Penúltima Contagem: ${dataPenultimaContagem}\n`;
+            }
+            csvContent += `Data de Exportação: ${new Date().toLocaleDateString('pt-BR')}\n\n`;
+            
+            // Cabeçalho
+            const headers = [];
+            if (colunas.item) headers.push('Item');
+            if (colunas.contagem) headers.push('Contagem');
+            if (colunas.consumoSemanal) headers.push('Consumo Semanal');
+            if (colunas.consumoSistema) headers.push('Consumo no Sistema');
+            if (colunas.diferenca) headers.push('Diferença');
+            if (colunas.estoqueTotal) headers.push('Estoque Total');
+            
+            csvContent += headers.join(';') + '\n';
+            
+            // Dados
+            document.querySelectorAll('#tabelaBody tr:not(.category-header)').forEach(row => {
+                const cells = row.querySelectorAll('td');
+                const values = [];
+                
+                if (colunas.item) values.push(`"${cells[0].textContent}"`);
+                if (colunas.contagem) values.push(cells[1].textContent);
+                if (colunas.consumoSemanal) values.push(cells[2].textContent);
+                if (colunas.consumoSistema) values.push(cells[3].querySelector('input').value);
+                if (colunas.diferenca) values.push(cells[4].querySelector('input').value);
+                if (colunas.estoqueTotal) values.push(cells[5].textContent);
+                
+                csvContent += values.join(';') + '\n';
+            });
+            
+            // Criar e baixar o arquivo
+            const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute("href", url);
+            link.setAttribute("download", `${nomeArquivo}.csv`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            mostrarToast('Dados exportados com sucesso para CSV', 'success');
+        }
+        
+        // Função para exportar para JSON
+        function exportarParaJSON(colunas, nomeArquivo) {
+            const dados = {
+                metadata: {
+                    dataUltimaContagem: dataUltimaContagem,
+                    dataPenultimaContagem: dataPenultimaContagem,
+                    dataExportacao: new Date().toLocaleDateString('pt-BR'),
+                    tipo: 'contagem_estoque'
+                },
+                itens: []
+            };
+            
+            document.querySelectorAll('#tabelaBody tr:not(.category-header)').forEach(row => {
+                const cells = row.querySelectorAll('td');
+                const itemData = {};
+                
+                if (colunas.item) itemData.item = cells[0].textContent;
+                if (colunas.contagem) itemData.contagem = parseInt(cells[1].textContent);
+                if (colunas.consumoSemanal) itemData.consumoSemanal = parseInt(cells[2].textContent);
+                if (colunas.consumoSistema) itemData.consumoSistema = parseInt(cells[3].querySelector('input').value);
+                if (colunas.diferenca) itemData.diferenca = parseInt(cells[4].querySelector('input').value);
+                if (colunas.estoqueTotal) itemData.estoqueTotal = parseInt(cells[5].textContent);
+                
+                dados.itens.push(itemData);
+            });
+            
+            // Criar e baixar o arquivo
+            const jsonContent = JSON.stringify(dados, null, 2);
+            const blob = new Blob([jsonContent], { type: 'application/json' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute("href", url);
+            link.setAttribute("download", `${nomeArquivo}.json`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            mostrarToast('Dados exportados com sucesso para JSON', 'success');
+        }
+        
+        // Função para salvar dados
+        function salvarDados() {
+            // Verificar se o usuário está autenticado
+            if (!usuarioLogado) {
+                mostrarToast('É necessário fazer login para salvar os dados', 'warning');
+                document.getElementById('loginOverlay').style.display = 'flex';
+                return;
+            }
+            
+            const btnSalvar = document.getElementById('btnSalvar');
+            const spinner = btnSalvar.querySelector('.spinner-border');
+            const icon = btnSalvar.querySelector('.fa-save');
+            
+            // Mostrar spinner e esconder ícone
+            spinner.style.display = 'inline-block';
+            icon.style.display = 'none';
+            btnSalvar.disabled = true;
+            
+            const dadosParaSalvar = {};
+            
+            document.querySelectorAll('.consumo-sistema').forEach(input => {
+                const item = input.getAttribute('data-item');
+                const valor = parseInt(input.value) || 0;
+                dadosParaSalvar[item] = valor;
+            });
+            
+            database.ref('consumo_sistema').set(dadosParaSalvar)
+                .then(() => {
+                    // Atualizar dados locais
+                    dadosConsumo = {...dadosParaSalvar};
+                    alteracoesPendentes = false;
+                    
+                    // Atualizar indicador
+                    document.getElementById('autosaveIndicator').textContent = 'Todas as alterações salvas';
+                    document.getElementById('autosaveIndicator').style.color = '#198754';
+                    
+                    mostrarToast('Dados salvos com sucesso', 'success');
+                    
+                    // Restaurar botão
+                    spinner.style.display = 'none';
+                    icon.style.display = 'inline-block';
+                    btnSalvar.disabled = false;
+                })
+                .catch((error) => {
+                    console.error('Erro ao salvar dados:', error);
+                    mostrarToast('Erro ao salvar dados: ' + error.message, 'danger');
+                    
+                    // Restaurar botão mesmo em caso de erro
+                    spinner.style.display = 'none';
+                    icon.style.display = 'inline-block';
+                    btnSalvar.disabled = false;
+                });
+        }
+        
+        // Função para mostrar notificações toast
+        function mostrarToast(mensagem, tipo = 'info') {
+            const toastContainer = document.querySelector('.toast-container');
+            const toastId = 'toast-' + Date.now();
+            
+            const toastEl = document.createElement('div');
+            toastEl.className = `toast align-items-center text-white bg-${tipo} border-0`;
+            toastEl.setAttribute('role', 'alert');
+            toastEl.setAttribute('aria-live', 'assertive');
+            toastEl.setAttribute('aria-atomic', 'true');
+            toastEl.id = toastId;
+            
+            toastEl.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        ${mensagem}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            `;
+            
+            toastContainer.appendChild(toastEl);
+            
+            const toast = new bootstrap.Toast(toastEl, {
+                autohide: true,
+                delay: 3000
+            });
+            
+            toast.show();
+            
+            // Remover o toast do DOM após ser escondido
+            toastEl.addEventListener('hidden.bs.toast', function() {
+                toastEl.remove();
+            });
+        }
+        
+        // Função de logout
+        function fazerLogout() {
+            if (alteracoesPendentes) {
+                if (!confirm('Existem alterações não salvas. Deseja realmente sair sem salvar?')) {
+                    return;
+                }
+            }
+            
+            if (confirm('Deseja realmente sair do sistema?')) {
+                auth.signOut().then(() => {
+                    usuarioLogado = null;
+                    localStorage.removeItem('usuarioLogado');
+                    window.location.href = 'index.html';
+                });
+            }
+        }
+        
+        // Verificar autenticação e carregar dados
+        document.addEventListener('DOMContentLoaded', function() {
+            // Verificar se há usuário salvo localmente
+            const usuarioSalvo = localStorage.getItem('usuarioLogado');
+            if (usuarioSalvo) {
+                const usuario = JSON.parse(usuarioSalvo);
+                document.getElementById('loginEmail').value = usuario.email;
+            }
+            
+            // Verificar estado de autenticação
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    // Usuário autenticado
+                    usuarioLogado = user;
+                    document.getElementById('loginOverlay').style.display = 'none';
+                    carregarDados();
+                } else {
+                    // Usuário não autenticado
+                    usuarioLogado = null;
+                    document.getElementById('loginOverlay').style.display = 'flex';
+                }
+            });
+            
+            // Avisar antes de sair da página se houver alterações não salvas
+            window.addEventListener('beforeunload', function(e) {
+                if (alteracoesPendentes) {
+                    e.preventDefault();
+                    e.returnValue = 'Existem alterações não salvas. Deseja realmente sair?';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
