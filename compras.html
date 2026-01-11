@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Contagem de Estoque</title>
+    <title>Registro de Compras</title>
+    <link rel="icon" href="imagens/icon.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -13,10 +14,6 @@
         body {
             background-color: #f8f9fa;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .header {
-            background-color: #ffc107;
-            color: #343a40;
         }
         .table-header {
             background-color: #343a40;
@@ -34,7 +31,7 @@
             max-height: 80vh;
             overflow-y: auto;
         }
-        input[type="text"] {
+        input[type="number"], input[type="text"] {
             width: 100%;
             border: 1px solid #ced4da;
             border-radius: 4px;
@@ -50,11 +47,9 @@
             padding-left: 10px;
             margin: 20px 0;
         }
-        .loading {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 200px;
+        .valor-total {
+            background-color: #e7f3ff;
+            font-weight: bold;
         }
         .btn-save {
             position: relative;
@@ -71,22 +66,14 @@
             right: 20px;
             z-index: 9999;
         }
-        .input-decimal {
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-        }
-        .input-invalido {
-            border-color: #dc3545 !important;
-            background-color: #f8d7da !important;
-        }
     </style>
 </head>
 <body>
-    <!-- Cabeçalho -->
+     <!-- Cabeçalho -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
         <div class="container">
             <a class="navbar-brand nav-brand" href="#">
-                <i class="fas fa-boxes me-2"></i>Controle de Estoque
+                <i class="fas fa-users-cog me-2"></i>Controle de Estoque
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -94,14 +81,22 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link active" href="contagem.html"><i class="fas fa-clipboard-list me-1"></i>Contagem</a>
+                        <a class="nav-link" href="contagem.html"><i class="fas fa-clipboard-list me-1"></i>Contagem</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="registros.html"><i class="fas fa-history me-1"></i>Registros</a>
                     </li>
-                    
                     <li class="nav-item">
-                        <a class="nav-link" href="admin.html"><i class="fas fa-users-cog me-1"></i>Admin Usuários</a>
+                        <a class="nav-link" href="adm_est.html"><i class="fas fa-chart-line me-1"></i>Admin Estoque</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="compras.html"><i class="fas fa-cart-plus me-1"></i>Compras</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="tab_compras.html"><i class="fas fa-receipt me-1"></i>Relatório Compras</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="admin.html"><i class="fas fa-users-cog me-1"></i>Admin Usuários</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#" onclick="fazerLogout()"><i class="fas fa-sign-out-alt me-1"></i>Sair</a>
@@ -114,20 +109,20 @@
     <div class="container mt-4">
         <div class="row">
             <div class="col-12">
-                <h2 class="section-title">Contagem de Estoque</h2>
+                <h2 class="section-title">Registro de Compras</h2>
                 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    Preencha as quantidades atuais de cada item do estoque. Use ponto ou vírgula para números decimais.
+                    Preencha os campos abaixo para registrar novas compras. Apenas os itens com informações preenchidas serão salvos.
                 </div>
                 
                 <div class="card shadow-sm">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="card-title mb-0">Itens do Estoque</h5>
+                            <h5 class="card-title mb-0">Itens para Compra</h5>
                             <div>
-                                <button class="btn btn-success btn-save" onclick="salvarContagem()" id="btnSalvar">
-                                    <i class="fas fa-save me-1"></i>Salvar Contagem
+                                <button class="btn btn-success btn-save" onclick="salvarCompras()" id="btnSalvar">
+                                    <i class="fas fa-save me-1"></i>Salvar Compras
                                     <span class="spinner-border spinner-border-sm"></span>
                                 </button>
                             </div>
@@ -137,14 +132,22 @@
                             <table class="table table-bordered table-hover table-striped">
                                 <thead class="table-header">
                                     <tr>
-                                        <th width="70%">Item</th>
-                                        <th width="30%">Quantidade</th>
+                                        <th width="25%">Item</th>
+                                        <th width="15%">Valor Unitário (R$)</th>
+                                        <th width="15%">Quantidade</th>
+                                        <th width="20%">Fornecedor</th>
+                                        <th width="15%">Valor Total (R$)</th>
+                                        <th width="10%">Ações</th>
                                     </tr>
                                 </thead>
-                                <tbody id="tabelaContagem">
+                                <tbody id="tabelaCompras">
                                     <!-- Os dados serão preenchidos via JavaScript -->
                                 </tbody>
                             </table>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <strong>Total Geral: R$ <span id="totalGeral">0,00</span></strong>
                         </div>
                     </div>
                 </div>
@@ -169,15 +172,7 @@
         };
 
         // Inicializar Firebase
-        try {
-            if (!firebase.apps.length) {
-                firebase.initializeApp(firebaseConfig);
-            }
-            console.log('Firebase inicializado com sucesso');
-        } catch (error) {
-            console.error('Erro ao inicializar Firebase:', error);
-        }
-
+        firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
         const auth = firebase.auth();
 
@@ -188,32 +183,29 @@
                 "Brahma", "Tiger"
             ],
             "Longneck": [
-                "Heiniken Longneck", "Heiniken Zero", "Eisenbahn", "Eisenbahn IPA", "Patagônia", 
-                "Skol Beats", "Smirnoff Ice", "Lagunitas", "Corona", 
+                "Heiniken Longneck", "Heiniken Zero", "Eisenbahn", "Patagônia", 
+                "Skol Beats", "Smirnoff Ice", "Lagunitas", "Becks", "Corona", 
                 "Stella", "Stella Gold", "Sol", "Sol Zero", "Budweiser", 
-                "Budweiser Zero", "Spaten", "Mix Gin Tônica", "Mix Gin Tônica Pink",
-                "Mix Vodka Citru", "Mix Splitz"
+                "Budweiser Zero", "Spaten"
             ],
             "Soft Drinks": [
                 "Coca Cola", "Coca Zero", "Fanta Laranja", "Fanta Uva", 
-                "Fanta Guaraná", "Sprite","Sprite Zero", "Schweppes Citrus", "Schweppes Citrus Zero", 
+                "Fanta Guaraná", "Schweppes Citrus", "Schweppes Citrus Zero", 
                 "Schweppes Tônica", "Schweppes Tônica Zero", "Água", 
                 "Água com Gás", "Tonica 1,5L", "Citrus 1,5L"
             ],
             "Energéticos": [
                 "Red Bull", "Red Bull Sugar Free", "Red Bull Tropical", 
                 "Red Bull Melão", "Red Bull Pomelo", "Red Bull Pessêgo", 
-                "Red Bull Melancia", "Monster", "Monster Mango Loco", "Monster Zero",
-                "Monster Melancia"
+                "Red Bull Melancia", "Monster", "Monster Mango Loco"
             ],
             "Bases Alcoolicas": [
-                "Bacardi Ouro", "Bacardi Prata", "Smirnoff", "Jack Daniels", "Jack Honney", 
+                "Bacardi Ouro", "Bacardi Prata", "Smirnoff", "Jack Daniels", 
                 "Campari", "Aperol", "Vermouth Rosso", "Absolut", "Tequila Ouro", 
                 "Tequila Prata", "Jim Beam", "Licor Fino", "Steinhager", 
-                "Chivas 12", "Chivas 15", "Chivas 18", "Velho Barrero", "Sake", "Vinho", 
+                "Chivas 12", "Chivas 15", "Velho Barrero", "Sake", "Vinho", 
                 "Malibu", "Martine Dry", "Cachaça Artesanal", "Licor de Menta", 
-                "Gordons", "Gordons Rose", "Espumante", "Jagermeister", "Licor 43", "Doka",
-                "Bananinha", "Coquinha"
+                "Gordons", "Gordons Rose", "Espumante", "Jagermeister", "Licor 43"
             ],
             "Monin": [
                 "Monin Blue Barry", "Monin Morango", "Monin Toranja", 
@@ -226,56 +218,9 @@
 
         let usuarioLogado = null;
 
-        // Função para formatar número decimal
-        function formatarDecimal(valor) {
-            // Substituir vírgula por ponto e remover caracteres inválidos
-            let valorFormatado = valor.replace(',', '.').replace(/[^\d.]/g, '');
-            
-            // Remover pontos extras, mantendo apenas o primeiro
-            const partes = valorFormatado.split('.');
-            if (partes.length > 2) {
-                valorFormatado = partes[0] + '.' + partes.slice(1).join('');
-            }
-            
-            return valorFormatado;
-        }
-
-        // Função para validar número decimal
-        function validarNumero(valor) {
-            if (valor === '' || valor === '0') return true;
-            
-            const valorFormatado = formatarDecimal(valor);
-            const numero = parseFloat(valorFormatado);
-            
-            return !isNaN(numero) && numero >= 0;
-        }
-
-        // Função para converter string para número
-        function converterParaNumero(valor) {
-            if (valor === '' || valor === '0') return 0;
-            
-            const valorFormatado = formatarDecimal(valor);
-            const numero = parseFloat(valorFormatado);
-            
-            return isNaN(numero) ? 0 : numero;
-        }
-
-        // Função para formatar exibição do número
-        function formatarExibicao(valor) {
-            const numero = converterParaNumero(valor);
-            if (numero === 0) return '';
-            
-            // Verificar se é número inteiro ou decimal
-            if (Number.isInteger(numero)) {
-                return numero.toString();
-            } else {
-                return numero.toFixed(3).replace(/\.?0+$/, '');
-            }
-        }
-
-        // Função para preencher a tabela de contagem
-        function preencherTabelaContagem() {
-            const tabelaBody = document.getElementById('tabelaContagem');
+        // Função para preencher a tabela de compras
+        function preencherTabelaCompras() {
+            const tabelaBody = document.getElementById('tabelaCompras');
             tabelaBody.innerHTML = '';
             
             // Percorrer todas as categorias e itens
@@ -283,7 +228,7 @@
                 // Adicionar cabeçalho da categoria
                 const categoriaRow = document.createElement('tr');
                 categoriaRow.className = 'category-header';
-                categoriaRow.innerHTML = `<td colspan="2">${categoria}</td>`;
+                categoriaRow.innerHTML = `<td colspan="6">${categoria}</td>`;
                 tabelaBody.appendChild(categoriaRow);
                 
                 // Adicionar itens da categoria
@@ -292,12 +237,25 @@
                     row.innerHTML = `
                         <td>${item}</td>
                         <td>
-                            <input type="text" 
-                                   class="quantidade input-decimal" 
-                                   data-item="${item}" 
-                                   placeholder="0"
-                                   oninput="validarInput(this)"
-                                   onblur="formatarInput(this)">
+                            <input type="number" step="0.01" min="0" class="valor-unitario" data-item="${item}" 
+                                placeholder="0,00" oninput="calcularValorTotal('${item}')">
+                        </td>
+                        <td>
+                            <input type="number" min="0" class="quantidade" data-item="${item}" 
+                                placeholder="0" oninput="calcularValorTotal('${item}')">
+                        </td>
+                        <td>
+                            <input type="text" class="fornecedor" data-item="${item}" 
+                                placeholder="Nome do fornecedor">
+                        </td>
+                        <td>
+                            <input type="text" class="valor-total" data-item="${item}" 
+                                readonly value="R$ 0,00">
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger" onclick="limparLinha('${item}')">
+                                <i class="fas fa-times"></i>
+                            </button>
                         </td>
                     `;
                     tabelaBody.appendChild(row);
@@ -305,38 +263,43 @@
             }
         }
 
-        // Função para validar input em tempo real
-        function validarInput(input) {
-            const valor = input.value;
-            const isValid = validarNumero(valor);
+        // Função para calcular o valor total de um item
+        function calcularValorTotal(item) {
+            const valorUnitario = parseFloat(document.querySelector(`.valor-unitario[data-item="${item}"]`).value) || 0;
+            const quantidade = parseInt(document.querySelector(`.quantidade[data-item="${item}"]`).value) || 0;
+            const valorTotal = valorUnitario * quantidade;
             
-            if (isValid) {
-                input.classList.remove('input-invalido');
-            } else {
-                input.classList.add('input-invalido');
-            }
+            const valorTotalInput = document.querySelector(`.valor-total[data-item="${item}"]`);
+            valorTotalInput.value = `R$ ${valorTotal.toFixed(2).replace('.', ',')}`;
+            
+            calcularTotalGeral();
         }
 
-        // Função para formatar input quando perde o foco
-        function formatarInput(input) {
-            const valorFormatado = formatarExibicao(input.value);
-            input.value = valorFormatado;
-            input.classList.remove('input-invalido');
+        // Função para calcular o total geral
+        function calcularTotalGeral() {
+            let totalGeral = 0;
+            document.querySelectorAll('.valor-total').forEach(input => {
+                const valor = parseFloat(input.value.replace('R$ ', '').replace(',', '.')) || 0;
+                totalGeral += valor;
+            });
+            
+            document.getElementById('totalGeral').textContent = totalGeral.toFixed(2).replace('.', ',');
         }
 
-        // Função para salvar a contagem
-        function salvarContagem() {
-            // Verificar se o usuário está autenticado
+        // Função para limpar uma linha
+        function limparLinha(item) {
+            document.querySelector(`.valor-unitario[data-item="${item}"]`).value = '';
+            document.querySelector(`.quantidade[data-item="${item}"]`).value = '';
+            document.querySelector(`.fornecedor[data-item="${item}"]`).value = '';
+            document.querySelector(`.valor-total[data-item="${item}"]`).value = 'R$ 0,00';
+            
+            calcularTotalGeral();
+        }
+
+        // Função para salvar as compras
+        function salvarCompras() {
             if (!usuarioLogado) {
-                mostrarToast('É necessário fazer login para salvar a contagem', 'warning');
-                return;
-            }
-
-            // Verificar se há inputs inválidos
-            const inputsInvalidos = document.querySelectorAll('.input-invalido');
-            if (inputsInvalidos.length > 0) {
-                mostrarToast('Existem valores inválidos na contagem. Corrija os campos destacados em vermelho.', 'danger');
-                inputsInvalidos[0].focus();
+                mostrarToast('É necessário fazer login para salvar as compras', 'warning');
                 return;
             }
 
@@ -349,63 +312,59 @@
             icon.style.display = 'none';
             btnSalvar.disabled = true;
 
-            // Coletar dados da contagem
-            const contagem = {};
-            let totalItens = 0;
-            let itensComQuantidade = 0;
-            
-            document.querySelectorAll('.quantidade').forEach(input => {
-                const item = input.getAttribute('data-item');
-                const quantidade = converterParaNumero(input.value);
-                contagem[item] = quantidade;
-                
-                if (quantidade > 0) {
-                    totalItens++;
-                    itensComQuantidade++;
-                }
-            });
-
+            const compras = [];
             const timestamp = new Date().getTime();
             const dataHora = new Date().toLocaleString('pt-BR');
-            const data = new Date().toLocaleDateString('pt-BR');
 
-            console.log('Salvando contagem:', {
-                itens: contagem,
-                timestamp: timestamp,
-                usuario: usuarioLogado.email,
-                totalItens: totalItens,
-                itensComQuantidade: itensComQuantidade
+            // Coletar apenas os itens com informações preenchidas
+            document.querySelectorAll('.valor-unitario').forEach(input => {
+                const item = input.getAttribute('data-item');
+                const valorUnitario = parseFloat(input.value) || 0;
+                const quantidade = parseInt(document.querySelector(`.quantidade[data-item="${item}"]`).value) || 0;
+                const fornecedor = document.querySelector(`.fornecedor[data-item="${item}"]`).value.trim();
+                const valorTotal = valorUnitario * quantidade;
+
+                if (valorUnitario > 0 && quantidade > 0 && fornecedor) {
+                    compras.push({
+                        item: item,
+                        valorUnitario: valorUnitario,
+                        quantidade: quantidade,
+                        fornecedor: fornecedor,
+                        valorTotal: valorTotal,
+                        timestamp: timestamp,
+                        dataHora: dataHora,
+                        usuario: usuarioLogado.email
+                    });
+                }
             });
 
+            if (compras.length === 0) {
+                mostrarToast('Nenhum item válido para salvar. Preencha pelo menos um item completamente.', 'warning');
+                spinner.style.display = 'none';
+                icon.style.display = 'inline-block';
+                btnSalvar.disabled = false;
+                return;
+            }
+
             // Salvar no Firebase
-            database.ref('contagens').push().set({
-                itens: contagem,
+            const registroRef = database.ref('compras').push();
+            registroRef.set({
+                compras: compras,
                 timestamp: timestamp,
                 dataHora: dataHora,
-                data: data,
                 usuario: usuarioLogado.email,
-                totalItens: totalItens,
-                itensComQuantidade: itensComQuantidade
+                totalGeral: compras.reduce((total, compra) => total + compra.valorTotal, 0)
             })
             .then(() => {
-                console.log('Contagem salva com sucesso!');
-                mostrarToast('Contagem salva com sucesso!', 'success');
+                mostrarToast('Compras salvas com sucesso!', 'success');
+                // Limpar os campos preenchidos
+                compras.forEach(compra => {
+                    limparLinha(compra.item);
+                });
             })
             .catch((error) => {
-                console.error('Erro detalhado ao salvar contagem:', error);
-                
-                let mensagemErro = 'Erro ao salvar contagem: ';
-                
-                if (error.code === 'PERMISSION_DENIED') {
-                    mensagemErro += 'Permissão negada. Verifique:';
-                    mensagemErro += '\n1. Se as regras do Firebase estão configuradas corretamente';
-                    mensagemErro += '\n2. Se o usuário está autenticado';
-                    mensagemErro += '\n3. Se o nó "contagens" existe nas regras';
-                } else {
-                    mensagemErro += error.message;
-                }
-                
-                mostrarToast(mensagemErro, 'danger');
+                console.error('Erro ao salvar compras:', error);
+                mostrarToast('Erro ao salvar compras: ' + error.message, 'danger');
             })
             .finally(() => {
                 // Restaurar botão
@@ -440,7 +399,7 @@
             
             const toast = new bootstrap.Toast(toastEl, {
                 autohide: true,
-                delay: 5000
+                delay: 3000
             });
             
             toast.show();
@@ -468,21 +427,11 @@
             auth.onAuthStateChanged((user) => {
                 if (user) {
                     usuarioLogado = user;
-                    console.log('Usuário autenticado:', user.email);
-                    preencherTabelaContagem();
+                    preencherTabelaCompras();
                 } else {
-                    console.log('Usuário não autenticado, redirecionando...');
                     window.location.href = 'index.html';
                 }
             });
-        });
-
-        // Adicionar atalhos de teclado
-        document.addEventListener('keydown', function(e) {
-            // Ctrl + Enter para salvar
-            if (e.ctrlKey && e.key === 'Enter') {
-                salvarContagem();
-            }
         });
     </script>
 </body>
